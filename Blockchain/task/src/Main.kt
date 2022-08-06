@@ -2,7 +2,9 @@ package blockchain
 
 
 fun main() {
-    val blockchain = Blockchain()
+    print("Enter how many zeros the hash must start with: ")
+    val difficultyLevel = readln().toInt()
+    val blockchain = Blockchain(difficultyLevel)
 
     blockchain.generateNewBlock()
     blockchain.generateNewBlock()
@@ -12,4 +14,3 @@ fun main() {
 
     blockchain.printBlockchain()
 }
-

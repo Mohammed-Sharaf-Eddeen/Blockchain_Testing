@@ -1,8 +1,9 @@
 package blockchain
 
 import java.security.MessageDigest
+import java.util.*
 
-class Blockchain {
+class Blockchain(private var difficultyLevel: Int) {
     private var length: Int = 0
     private val blocksList: MutableList<Block> = mutableListOf()
 
@@ -38,22 +39,45 @@ class Blockchain {
     inner class Block {
         private val id: Int = length + 1
         private val timestamp: Long = System.currentTimeMillis()
+        private var magicNumber: Long
         private val previousBlockHash: String
         private val currentBlockHash: String
+        private val creationTime: Int
 
         init {
+            val creationStartingTime = System.currentTimeMillis()
             previousBlockHash = if (blocksList.isEmpty()) "0" else blocksList.last().currentBlockHash
+
+            // Generating how the hash should look like
+            val difficultyStringBuilder: StringBuilder = StringBuilder()
+            for (i in 1..difficultyLevel){
+                difficultyStringBuilder.append("0")
+            }
+            val difficultyString = difficultyStringBuilder.toString()
+
+            // Testing for the magic number that will pass the difficulty level
+            while (true) {
+                magicNumber = Random().nextLong()
+                val testedHash = applySha256(this.toString())
+                if (testedHash.startsWith(difficultyString)) {
+                    break
+                }
+            }
             currentBlockHash = applySha256(this.toString())
+            creationTime = ((System.currentTimeMillis() - creationStartingTime) / 1000).toInt()
         }
 
         override fun toString(): String {
             return "Block: \n" +
                     "Id: $id \n" +
-                    "Timestamp: $timestamp\n" +
+                    "Timestamp: $timestamp \n" +
+                    "Magic number: $magicNumber \n" +
                     "Hash of the previous block: \n" +
                     "$previousBlockHash \n" +
                     "Hash of the block: \n" +
-                    "$currentBlockHash \n"
+                    "$currentBlockHash \n" +
+                    "Block was generating for $creationTime seconds \n"
+
         }
     }
 }
