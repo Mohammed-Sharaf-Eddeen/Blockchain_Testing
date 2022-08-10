@@ -1,22 +1,91 @@
 package blockchain
 
 import java.security.MessageDigest
-import java.util.*
 
-class Blockchain(private var difficultyLevel: Int) {
+class Blockchain(_difficultyLevel: Int) {
+    var difficultyLevel = _difficultyLevel
+    private set
     private var length: Int = 0
     private val blocksList: MutableList<Block> = mutableListOf()
+    private val blockBeingHashedData: MutableList<String> = mutableListOf()
 
-    fun generateNewBlock() {
-        val newBlock = Block()
-        blocksList.add(newBlock)
-        length++
+    @Synchronized fun appendNewBlock(newBlock: Block): Boolean {
+        if (validateComingBlock(newBlock)) {
+            blocksList.add(newBlock)
+            length++
+            blockBeingHashedData.clear()
+            evaluateDifficultyLevel(newBlock)
+            return true
+        }
+        return false
     }
 
-    fun printBlockchain(){
+    @Synchronized private fun evaluateDifficultyLevel(newBlock: Block) {
+        // if less than 60 seconds, increase difficulty level. Otherwise, decrease it!
+        if (newBlock.creationTime < 60) {
+            difficultyLevel++
+        } else {
+            difficultyLevel--
+        }
+    }
+
+    private fun validateComingBlock(block: Block): Boolean {
+        if (length == 0) {
+            return testFirstBlock(block)
+        }
+        return testAfterFirstBlock(block)
+    }
+
+    @Synchronized fun printBlockchain(){
         for (block in blocksList) {
             println(block)
         }
+    }
+
+    private fun testAfterFirstBlock(newBlock: Block): Boolean {
+        val lastCurrentBlock: Block = blocksList.last()
+
+        if (newBlock.id <= lastCurrentBlock.id) {
+            return false
+        }
+        if (newBlock.timestamp <= lastCurrentBlock.timestamp) {
+            return false
+        }
+        if (newBlock.previousBlockHash != lastCurrentBlock.currentBlockHash) {
+            return false
+        }
+        if (applySha256(lastCurrentBlock.toStringWithoutCurrentHashField()) != lastCurrentBlock.currentBlockHash) {
+            return false
+        }
+
+        return true
+    }
+
+    private fun testFirstBlock(firstBlock: Block): Boolean {
+        if (firstBlock.id != 1) {
+            return false
+        }
+        if (firstBlock.previousBlockHash != "0") {
+            return false
+        }
+        if (applySha256(firstBlock.toStringWithoutCurrentHashField()) != firstBlock.currentBlockHash) {
+            return false
+        }
+
+        return true
+    }
+
+    @Synchronized fun getLastBlock(): Block? {
+        if (blocksList.isNotEmpty()) return blocksList.last()
+        return null
+    }
+
+    @Synchronized fun addDataToBlockBeingHashed(data: String) {
+        blockBeingHashedData.add(data)
+    }
+    fun getDataOfBlockBeingHashed(): String {
+        return if (blockBeingHashedData.isEmpty()) "No Messages"
+        else blockBeingHashedData.joinTo(StringBuilder(), " \n").toString()
     }
 
     fun applySha256(input: String): String {
@@ -36,48 +105,4 @@ class Blockchain(private var difficultyLevel: Int) {
         }
     }
 
-    inner class Block {
-        private val id: Int = length + 1
-        private val timestamp: Long = System.currentTimeMillis()
-        private var magicNumber: Long
-        private val previousBlockHash: String
-        private val currentBlockHash: String
-        private val creationTime: Int
-
-        init {
-            val creationStartingTime = System.currentTimeMillis()
-            previousBlockHash = if (blocksList.isEmpty()) "0" else blocksList.last().currentBlockHash
-
-            // Generating how the hash should look like
-            val difficultyStringBuilder: StringBuilder = StringBuilder()
-            for (i in 1..difficultyLevel){
-                difficultyStringBuilder.append("0")
-            }
-            val difficultyString = difficultyStringBuilder.toString()
-
-            // Testing for the magic number that will pass the difficulty level
-            while (true) {
-                magicNumber = Random().nextLong()
-                val testedHash = applySha256(this.toString())
-                if (testedHash.startsWith(difficultyString)) {
-                    break
-                }
-            }
-            currentBlockHash = applySha256(this.toString())
-            creationTime = ((System.currentTimeMillis() - creationStartingTime) / 1000).toInt()
-        }
-
-        override fun toString(): String {
-            return "Block: \n" +
-                    "Id: $id \n" +
-                    "Timestamp: $timestamp \n" +
-                    "Magic number: $magicNumber \n" +
-                    "Hash of the previous block: \n" +
-                    "$previousBlockHash \n" +
-                    "Hash of the block: \n" +
-                    "$currentBlockHash \n" +
-                    "Block was generating for $creationTime seconds \n"
-
-        }
-    }
 }

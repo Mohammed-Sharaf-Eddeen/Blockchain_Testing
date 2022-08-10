@@ -237,6 +237,217 @@ files:
         }
     }
   learner_created: false
+- name: src/Block.kt
+  visible: true
+  text: |
+    package blockchain
+
+
+    class Block() {
+        var id: Int = 0
+        var miner: String = ""
+        var timestamp: Long = 0L
+        var magicNumber: Long = 0L
+        var previousBlockHash: String = ""
+        var currentBlockHash: String = ""
+        var creationTime: Int = 0
+        var difficultyLevel: Int = 0
+
+        override fun toString(): String {
+            return "Block: \n" +
+                    "Created by: miner # $miner \n" +
+                    "Id: $id \n" +
+                    "Timestamp: $timestamp \n" +
+                    "Magic number: $magicNumber \n" +
+                    "Hash of the previous block: \n" +
+                    "$previousBlockHash \n" +
+                    "Hash of the block: \n" +
+                    "$currentBlockHash \n" +
+                    "Block was being generated for $creationTime seconds \n" +
+                    "Difficulty Level (N) is $difficultyLevel \n"
+        }
+
+        // currentBlockHash can't be hashed because it is not already there yet! What is being hashed is its default value!
+        // So after adding it to the block and trying to validate the hash, the validation would fail.
+        // So, it should not be there for hashing from the beginning
+        fun toStringWithoutCurrentHashField(): String {
+            return "Block: \n" +
+                    "Created by: miner # $miner \n" +
+                    "Id: $id \n" +
+                    "Timestamp: $timestamp \n" +
+                    "Magic number: $magicNumber \n" +
+                    "Hash of the previous block: \n" +
+                    "$previousBlockHash \n" +
+                    "Block was generating for $creationTime seconds \n"
+
+        }
+    }
+  learner_created: true
+- name: src/Blockchain.kt
+  visible: true
+  text: |-
+    package blockchain
+
+    import java.security.MessageDigest
+
+    class Blockchain(_difficultyLevel: Int) {
+        var difficultyLevel = _difficultyLevel
+        private set
+        private var length: Int = 0
+        private val blocksList: MutableList<Block> = mutableListOf()
+
+        @Synchronized fun appendNewBlock(newBlock: Block): Boolean {
+            if (validateComingBlock(newBlock)) {
+                blocksList.add(newBlock)
+                length++
+                evaluateDifficultyLevel(newBlock)
+                return true
+            }
+            return false
+        }
+
+        @Synchronized private fun evaluateDifficultyLevel(newBlock: Block) {
+            // if less than 60 seconds, increase difficulty level. Otherwise, decrease it!
+            if (newBlock.creationTime < 60) {
+                difficultyLevel++
+            } else {
+                difficultyLevel--
+            }
+        }
+
+        private fun validateComingBlock(block: Block): Boolean {
+            if (length == 0) {
+                return testFirstBlock(block)
+            }
+            return testAfterFirstBlock(block)
+        }
+
+        @Synchronized fun printBlockchain(){
+            for (block in blocksList) {
+                println(block)
+            }
+        }
+
+        private fun testAfterFirstBlock(newBlock: Block): Boolean {
+            val lastCurrentBlock: Block = blocksList.last()
+
+            if (newBlock.id <= lastCurrentBlock.id) {
+                return false
+            }
+            if (newBlock.timestamp <= lastCurrentBlock.timestamp) {
+                return false
+            }
+            if (newBlock.previousBlockHash != lastCurrentBlock.currentBlockHash) {
+                return false
+            }
+            if (applySha256(lastCurrentBlock.toStringWithoutCurrentHashField()) != lastCurrentBlock.currentBlockHash) {
+                return false
+            }
+
+            return true
+        }
+
+        private fun testFirstBlock(firstBlock: Block): Boolean {
+            if (firstBlock.id != 1) {
+                return false
+            }
+            if (firstBlock.previousBlockHash != "0") {
+                return false
+            }
+            if (applySha256(firstBlock.toStringWithoutCurrentHashField()) != firstBlock.currentBlockHash) {
+                return false
+            }
+
+            return true
+        }
+
+        @Synchronized fun getLastBlock(): Block? {
+            if (blocksList.isNotEmpty()) return blocksList.last()
+            return null
+        }
+
+        fun applySha256(input: String): String {
+            return try {
+                val digest = MessageDigest.getInstance("SHA-256")
+                /* Applies sha256 to our input */
+                val hash = digest.digest(input.toByteArray(charset("UTF-8")))
+                val hexString = StringBuilder()
+                for (elem in hash) {
+                    val hex = Integer.toHexString(0xff and elem.toInt())
+                    if (hex.length == 1) hexString.append('0')
+                    hexString.append(hex)
+                }
+                hexString.toString()
+            } catch (e: Exception) {
+                throw RuntimeException(e)
+            }
+        }
+
+    }
+  learner_created: true
+- name: src/Miner.kt
+  visible: true
+  text: |-
+    package blockchain
+
+    import java.util.*
+    import java.util.concurrent.atomic.AtomicBoolean
+
+    class Miner(private val minerName: String, private val blockchain: Blockchain, private val running: AtomicBoolean): Runnable {
+        private val thread: Thread = Thread(this)
+
+        override fun run() {
+            while (running.get()) {
+                try {
+                    val newBlock = createNewBlock(blockchain.getLastBlock()) ?: return
+                    if (blockchain.appendNewBlock(newBlock)) {
+                        running.set(false)
+                    }
+                } catch (e: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                }
+            }
+        }
+
+        private fun createNewBlock(previousBlock: Block?): Block? {
+            val creationStartingTime = System.currentTimeMillis()
+
+            val newBlock = Block()
+            newBlock.id = (previousBlock?.id?.plus(1)) ?: 1
+            newBlock.miner = minerName
+            newBlock.previousBlockHash = previousBlock?.currentBlockHash ?: "0"
+            newBlock.difficultyLevel = blockchain.difficultyLevel
+
+            // Generating how the hash should look like
+            val difficultyStringBuilder: StringBuilder = StringBuilder()
+            for (i in 1..blockchain.difficultyLevel){
+                difficultyStringBuilder.append("0")
+            }
+            val difficultyString = difficultyStringBuilder.toString()
+
+            /*
+            Testing for the magic number that will pass the difficulty level
+            And changing the timestamp and creation time after each iteration in order to be included in the final hash
+            If they were included after testing the hash, this would mean that they were not hashed
+             */
+            // Keep digging for the new block till the thread gets a flag to stop from outside
+            while (running.get()) {
+                newBlock.magicNumber = Random().nextLong()
+                newBlock.timestamp = System.currentTimeMillis()
+                newBlock.creationTime = ((System.currentTimeMillis() - creationStartingTime) / 1000).toInt()
+                newBlock.currentBlockHash = blockchain.applySha256(newBlock.toStringWithoutCurrentHashField())
+
+                if (newBlock.currentBlockHash.startsWith(difficultyString)) {
+                    return newBlock
+                }
+            }
+            return null
+        }
+    }
+  learner_created: true
 feedback_link: https://hyperskill.org/learn/step/20395#comment
-status: Unchecked
-record: -1
+status: Solved
+feedback:
+  message: Congratulations!
+  time: Wed, 10 Aug 2022 07:59:54 UTC
+record: 4
