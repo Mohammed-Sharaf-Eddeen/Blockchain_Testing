@@ -1,4 +1,4 @@
-package blockchain
+package blockchain.backbone
 
 
 class Block {
@@ -14,7 +14,8 @@ class Block {
 
     override fun toString(): String {
             return "Block: \n" +
-                "Created by: miner # $miner \n" +
+                "Created by: $miner \n" +
+                "$miner gets 100 VC \n" +
                 "Id: $id \n" +
                 "Timestamp: $timestamp \n" +
                 "Magic number: $magicNumber \n" +
@@ -34,6 +35,7 @@ class Block {
     fun toStringWithoutCurrentHashField(): String {
         return "Block: \n" +
                 "Created by: miner # $miner \n" +
+                "$miner gets 100 VC \n" +
                 "Id: $id \n" +
                 "Timestamp: $timestamp \n" +
                 "Magic number: $magicNumber \n" +

@@ -1,5 +1,7 @@
 package blockchain
 
+import blockchain.backbone.Block
+import blockchain.backbone.Blockchain
 import java.util.*
 import java.util.concurrent.atomic.AtomicBoolean
 

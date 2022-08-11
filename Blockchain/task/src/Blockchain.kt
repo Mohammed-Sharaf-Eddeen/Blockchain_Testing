@@ -1,4 +1,4 @@
-package blockchain
+package blockchain.backbone
 
 import java.security.MessageDigest
 
@@ -8,10 +8,12 @@ class Blockchain(_difficultyLevel: Int) {
     private var length: Int = 0
     private val blocksList: MutableList<Block> = mutableListOf()
     private val blockBeingHashedData: MutableList<String> = mutableListOf()
+    private val transactionsLedger: TransactionsLedger = TransactionsLedger()
 
     @Synchronized fun appendNewBlock(newBlock: Block): Boolean {
         if (validateComingBlock(newBlock)) {
             blocksList.add(newBlock)
+            transactionsLedger.addBlockReward(newBlock.miner, 100)
             length++
             blockBeingHashedData.clear()
             evaluateDifficultyLevel(newBlock)
@@ -20,13 +22,13 @@ class Blockchain(_difficultyLevel: Int) {
         return false
     }
 
+    // No need for this step at this stage
     @Synchronized private fun evaluateDifficultyLevel(newBlock: Block) {
-        // if less than 60 seconds, increase difficulty level. Otherwise, decrease it!
-        if (newBlock.creationTime < 60) {
-            difficultyLevel++
-        } else {
-            difficultyLevel--
-        }
+//        if (newBlock.creationTime < 60) {
+//            difficultyLevel++
+//        } else {
+//            difficultyLevel--
+//        }
     }
 
     private fun validateComingBlock(block: Block): Boolean {
@@ -80,11 +82,21 @@ class Blockchain(_difficultyLevel: Int) {
         return null
     }
 
-    @Synchronized fun addDataToBlockBeingHashed(data: String) {
+    @Synchronized fun addTransaction(transaction: TransactionsLedger.Transaction) {
+        if (transactionsLedger.validateTransaction(transaction)) {
+            transactionsLedger.addTransaction(transaction)
+            addDataToBlockBeingHashed(transaction.toString())
+        }
+    }
+    fun createTransaction(sender: String, receiver: String, amount: Int): TransactionsLedger.Transaction {
+        return transactionsLedger.createTransaction(sender, receiver, amount)
+    }
+
+    @Synchronized private fun addDataToBlockBeingHashed(data: String) {
         blockBeingHashedData.add(data)
     }
     fun getDataOfBlockBeingHashed(): String {
-        return if (blockBeingHashedData.isEmpty()) "No Messages"
+        return if (blockBeingHashedData.isEmpty()) "No Transactions"
         else blockBeingHashedData.joinTo(StringBuilder(), " \n").toString()
     }
 
